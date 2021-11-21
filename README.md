@@ -1,0 +1,1 @@
+# calamitymod-wiki-recipe-generator
