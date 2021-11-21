@@ -2,14 +2,11 @@ import fandom
 from crafting_item import CraftingItem
 import json
 from bs4 import BeautifulSoup
-from treelib import Node, Tree
+from treelib import Tree
 
 fandom.set_wiki('calamitymod')
 
 cwiki = True
-#recipe_section = item_page.section("Recipe")
-#print(recipe_section)
-#print(json.dumps(item_page.content, indent=4))
 
 def flip_wiki():
     global cwiki
@@ -19,7 +16,7 @@ def flip_wiki():
         fandom.set_wiki('calamitymod')
     cwiki = not cwiki
 
-def get_recipe(itemname):
+def get_recipe_prettified(itemname):
     def get_recipe(itemname):
         recipe = {}
         try:
@@ -79,6 +76,68 @@ def get_recipe(itemname):
         }
     }
     return final_recipe
+
+
+
+
+
+def get_recipe(itemname):
+    def get_recipe(itemname, quantity=1):
+        recipe = {}
+        recipe['name'] = itemname
+        recipe['quantity'] = quantity
+        try:
+            item_page = fandom.page(title=itemname)
+        except (fandom.error.PageError, KeyError):
+            flip_wiki()
+            try:
+                item_page = fandom.page(title=itemname)
+            except fandom.error.PageError:
+                return recipe
+        sections = item_page.sections
+        if "Recipe" not in sections:
+            return recipe
+        html = BeautifulSoup(item_page.html, 'html.parser')
+
+        recipe_table = ''
+        for table in html.find_all('table'):
+            if 'Crafting Station' in table.find_next('tr').find_next('th').contents:
+                recipe_table = table
+                break
+        
+        mode = ''
+        
+        for tr in recipe_table.find_all('tr'):
+            if tr.find('th') is not None:
+                if tr.find('th').find('b') is None:
+                    content = tr.find('th').contents[0]
+                else:
+                    content = tr.find('th').find('b').contents[0]
+                if content == 'Crafting Station':
+                    mode = 'cs'
+                elif content == 'Ingredient(s)':
+                    mode = 'ing'
+                elif content == 'Result':
+                    mode = 'res'
+                continue
+
+            if mode == 'cs':
+                recipe['station'] = tr.find('a')['title']
+                recipe['recipe'] = []
+            elif mode == 'ing':
+                td = tr.find_all('td')
+                name = td[0].find('a')['title'] # ingredient name
+                quantity = int(td[2].contents[0])
+                recipe['recipe'].append(get_recipe(name, quantity))
+            elif mode == 'res':
+                continue
+        return recipe
+
+    return get_recipe(itemname)
+
+
+
+
 
 
 def create_tree_from_recipe(recipe):
