@@ -1,4 +1,5 @@
 import fandom
+from crafting_item import CraftingItem
 import json
 from bs4 import BeautifulSoup
 from treelib import Node, Tree
@@ -59,28 +60,53 @@ def get_recipe(itemname):
             elif mode == 'ing':
                 td = tr.find_all('td')
                 name = td[0].find('a')['title']
-                #print("ItemName: %s ; FoundName: %s" %(itemname, name))
-                recipe[name] = get_recipe(name)
+                recipe[name] = {}
                 try:
                     quantity = int(td[2].contents[0])
                     recipe[name]['quantity'] = quantity
                 except:
-                    recipe[name]['quantity'] = 1
+                    recipe[name]['quantity'] = 1  
+                recipe[name]['recipe'] = get_recipe(name)
+                if not recipe[name]['recipe']:
+                    recipe[name].pop('recipe')
             elif mode == 'res':
                 continue
         return recipe
-    return {
-        itemname: get_recipe(itemname)
+    final_recipe = {
+        itemname: {
+            'quantity': 1,
+            'recipe': get_recipe(itemname)
+        }
     }
+    return final_recipe
 
 
 def create_tree_from_recipe(recipe):
     tree = Tree()
-    def add_node():
-        for layer in recipe:
-            pass
+    root_init = False
+    keys = list(recipe.keys())
+
+    def add_nodes(layer, parentname):
+        nonlocal root_init
+        for item in layer:
+            if item == 'Station':
+                continue
+            if 'recipe' in layer[item]:
+                if root_init:
+                    node = tree.create_node(item, parent=parentname, data=CraftingItem(item, layer[item]['quantity'], layer[item]['recipe']['Station']))
+                else:
+                    node = tree.create_node(item, data=CraftingItem(item, layer[item]['quantity'], layer[item]['recipe']['Station']))
+                    root_init = True
+                add_nodes(layer[item]['recipe'], node.identifier)
+            else:
+                tree.create_node(item, parent=parentname, data=CraftingItem(item, layer[item]['quantity']))
 
 
-#get_recipe("Fallen Paladin\'s Hammer")
-print(json.dumps(get_recipe('Triactis\' True Paladinian Mage-Hammer of Might'), indent=4))
-#print(json.dumps(get_recipe('Zenith'), indent=4))
+
+
+    add_nodes(recipe, keys[0])
+
+    tree.show(data_property='printname')
+
+
+print(json.dumps(get_recipe('Fallen Paladin\'s Hammer'), indent=4))
